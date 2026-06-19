@@ -1,41 +1,73 @@
 #include "encripto.h"
-#include <stdlib.h>
 #include <string.h>
 
-struct encripto_hmac_ctx {
-    uint8_t key[64];
-    size_t key_len;
-};
+int encripto_hmac_sha256(const uint8_t *key, size_t key_len,
+                          const uint8_t *msg, size_t msg_len,
+                          uint8_t out[ENCRIPTO_HMAC_SHA256_DIGEST_SIZE]) {
+    uint8_t k_pad[64] = {0};
+    uint8_t inner[ENCRIPTO_SHA256_DIGEST_SIZE];
+    encripto_sha256_ctx ctx;
 
-encripto_hmac_ctx *encripto_hmac_new(const uint8_t *key, size_t key_len) {
-    encripto_hmac_ctx *ctx = calloc(1, sizeof(*ctx));
-    if (ctx) {
-        size_t cp = key_len < sizeof(ctx->key) ? key_len : sizeof(ctx->key);
-        memcpy(ctx->key, key, cp);
-        ctx->key_len = cp;
+    if (key_len > 64) {
+        encripto_sha256(key, key_len, k_pad);
+    } else {
+        memcpy(k_pad, key, key_len);
     }
-    return ctx;
+
+    for (size_t i = 0; i < 64; i++)
+        k_pad[i] ^= 0x36;
+
+    encripto_sha256_init(&ctx);
+    encripto_sha256_update(&ctx, k_pad, 64);
+    encripto_sha256_update(&ctx, msg, msg_len);
+    encripto_sha256_final(&ctx, inner);
+
+    for (size_t i = 0; i < 64; i++)
+        k_pad[i] ^= 0x36 ^ 0x5c;
+
+    encripto_sha256_init(&ctx);
+    encripto_sha256_update(&ctx, k_pad, 64);
+    encripto_sha256_update(&ctx, inner, sizeof(inner));
+    encripto_sha256_final(&ctx, out);
+
+    return 0;
 }
 
-void encripto_hmac_free(encripto_hmac_ctx *ctx) {
-    free(ctx);
+int encripto_hmac_sha512(const uint8_t *key, size_t key_len,
+                          const uint8_t *msg, size_t msg_len,
+                          uint8_t out[ENCRIPTO_HMAC_SHA512_DIGEST_SIZE]) {
+    uint8_t k_pad[128] = {0};
+    uint8_t inner[ENCRIPTO_SHA512_DIGEST_SIZE];
+    encripto_sha512_ctx ctx;
+
+    if (key_len > 128) {
+        encripto_sha512(key, key_len, k_pad);
+    } else {
+        memcpy(k_pad, key, key_len);
+    }
+
+    for (size_t i = 0; i < 128; i++)
+        k_pad[i] ^= 0x36;
+
+    encripto_sha512_init(&ctx);
+    encripto_sha512_update(&ctx, k_pad, 128);
+    encripto_sha512_update(&ctx, msg, msg_len);
+    encripto_sha512_final(&ctx, inner);
+
+    for (size_t i = 0; i < 128; i++)
+        k_pad[i] ^= 0x36 ^ 0x5c;
+
+    encripto_sha512_init(&ctx);
+    encripto_sha512_update(&ctx, k_pad, 128);
+    encripto_sha512_update(&ctx, inner, sizeof(inner));
+    encripto_sha512_final(&ctx, out);
+
+    return 0;
 }
 
-void encripto_hmac_update(encripto_hmac_ctx *ctx,
-                           const uint8_t *data, size_t len) {
-    (void)ctx;
-    (void)data;
-    (void)len;
-}
-
-void encripto_hmac_final_sha256(encripto_hmac_ctx *ctx,
-                                 uint8_t out[ENCRIPTO_HMAC_SHA256_DIGEST_SIZE]) {
-    memset(out, 0, ENCRIPTO_HMAC_SHA256_DIGEST_SIZE);
-    (void)ctx;
-}
-
-void encripto_hmac_final_sha512(encripto_hmac_ctx *ctx,
-                                 uint8_t out[ENCRIPTO_HMAC_SHA512_DIGEST_SIZE]) {
-    memset(out, 0, ENCRIPTO_HMAC_SHA512_DIGEST_SIZE);
-    (void)ctx;
+int encripto_hmac_verify(const uint8_t *a, const uint8_t *b, size_t len) {
+    uint8_t diff = 0;
+    for (size_t i = 0; i < len; i++)
+        diff |= a[i] ^ b[i];
+    return diff == 0 ? 0 : -1;
 }
