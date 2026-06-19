@@ -25,6 +25,7 @@
 | **Asymétrique** | **RSA-4096** | [cite_start]Chiffrement OAEP et Signature PSS[cite: 37]. |
 | **Hachage** | **SHA-256 / 512** | [cite_start]Conformes FIPS 180-4[cite: 40]. |
 | **Authentification** | **HMAC** | [cite_start]Basé sur SHA-256 et SHA-512 (RFC 2104)[cite: 46]. |
+| **Aléatoire Sécurisé** | **CSPRNG** | [cite_start]Générateur via getrandom(2) (Linux ≥ 3.17)[cite: 46]. |
 
 ---
 
@@ -61,3 +62,9 @@ encripto_sha512_final(&ctx, digest512);
 uint8_t key[32], iv[12], tag[16];
 uint8_t ct[PLAINTEXT_LEN];
 encripto_aes256_gcm_encrypt(key, iv, plaintext, len, ct, tag);
+
+// Génération aléatoire sécurisée
+uint8_t secret_key[32];
+encripto_rand_key(secret_key, sizeof(secret_key));
+// ou directement:
+encripto_rand_bytes(secret_key, sizeof(secret_key));
