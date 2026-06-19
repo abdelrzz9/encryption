@@ -91,21 +91,18 @@ int encripto_sha512_final(encripto_sha512_ctx *ctx,
 int encripto_sha512(const uint8_t *data, size_t len,
                      uint8_t out[ENCRIPTO_SHA512_DIGEST_SIZE]);
 
-/* ── HMAC ────────────────────────────────────────────────── */
+/* ── HMAC (RFC 2104) ──────────────────────────────────────── */
 
 #define ENCRIPTO_HMAC_SHA256_DIGEST_SIZE 32
 #define ENCRIPTO_HMAC_SHA512_DIGEST_SIZE 64
 
-typedef struct encripto_hmac_ctx encripto_hmac_ctx;
-
-encripto_hmac_ctx *encripto_hmac_new(const uint8_t *key, size_t key_len);
-void               encripto_hmac_free(encripto_hmac_ctx *ctx);
-void               encripto_hmac_update(encripto_hmac_ctx *ctx,
-                                         const uint8_t *data, size_t len);
-void               encripto_hmac_final_sha256(encripto_hmac_ctx *ctx,
-                                               uint8_t out[ENCRIPTO_HMAC_SHA256_DIGEST_SIZE]);
-void               encripto_hmac_final_sha512(encripto_hmac_ctx *ctx,
-                                               uint8_t out[ENCRIPTO_HMAC_SHA512_DIGEST_SIZE]);
+int encripto_hmac_sha256(const uint8_t *key, size_t key_len,
+                          const uint8_t *msg, size_t msg_len,
+                          uint8_t out[ENCRIPTO_HMAC_SHA256_DIGEST_SIZE]);
+int encripto_hmac_sha512(const uint8_t *key, size_t key_len,
+                          const uint8_t *msg, size_t msg_len,
+                          uint8_t out[ENCRIPTO_HMAC_SHA512_DIGEST_SIZE]);
+int encripto_hmac_verify(const uint8_t *a, const uint8_t *b, size_t len);
 
 /* ── Utilities ───────────────────────────────────────────── */
 
