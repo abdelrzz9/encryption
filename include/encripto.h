@@ -80,35 +80,45 @@ int encripto_hmac_verify(const uint8_t *a, const uint8_t *b, size_t len);
 
 #define ENCRIPTO_AES256_KEY_SIZE   32
 #define ENCRIPTO_AES256_BLOCK_SIZE 16
+#define ENCRIPTO_AES256_IV_SIZE    16
+#define ENCRIPTO_AES256_GCM_IV_SIZE  12
+#define ENCRIPTO_AES256_GCM_TAG_SIZE 16
 
-typedef struct encripto_aes256_ctx encripto_aes256_ctx;
-
-encripto_aes256_ctx *encripto_aes256_new(const uint8_t key[ENCRIPTO_AES256_KEY_SIZE]);
-void                 encripto_aes256_free(encripto_aes256_ctx *ctx);
-void                 encripto_aes256_encrypt(encripto_aes256_ctx *ctx,
-                                              const uint8_t in[ENCRIPTO_AES256_BLOCK_SIZE],
-                                              uint8_t out[ENCRIPTO_AES256_BLOCK_SIZE]);
-void                 encripto_aes256_decrypt(encripto_aes256_ctx *ctx,
-                                              const uint8_t in[ENCRIPTO_AES256_BLOCK_SIZE],
-                                              uint8_t out[ENCRIPTO_AES256_BLOCK_SIZE]);
+int encripto_aes256_cbc_encrypt(const uint8_t key[ENCRIPTO_AES256_KEY_SIZE],
+                                 const uint8_t iv[ENCRIPTO_AES256_IV_SIZE],
+                                 const uint8_t *pt, size_t len,
+                                 uint8_t *ct, size_t *ct_len);
+int encripto_aes256_cbc_decrypt(const uint8_t key[ENCRIPTO_AES256_KEY_SIZE],
+                                 const uint8_t iv[ENCRIPTO_AES256_IV_SIZE],
+                                 const uint8_t *ct, size_t ct_len,
+                                 uint8_t *pt, size_t *pt_len);
+int encripto_aes256_gcm_encrypt(const uint8_t key[ENCRIPTO_AES256_KEY_SIZE],
+                                 const uint8_t iv[ENCRIPTO_AES256_GCM_IV_SIZE],
+                                 const uint8_t *pt, size_t len,
+                                 uint8_t *ct, uint8_t tag[ENCRIPTO_AES256_GCM_TAG_SIZE]);
+int encripto_aes256_gcm_decrypt(const uint8_t key[ENCRIPTO_AES256_KEY_SIZE],
+                                 const uint8_t iv[ENCRIPTO_AES256_GCM_IV_SIZE],
+                                 const uint8_t *ct, size_t len,
+                                 const uint8_t tag[ENCRIPTO_AES256_GCM_TAG_SIZE],
+                                 uint8_t *pt);
 
 /* ── ChaCha20-Poly1305 ───────────────────────────────────── */
 
 #define ENCRIPTO_CHACHA20_KEY_SIZE   32
 #define ENCRIPTO_CHACHA20_NONCE_SIZE 12
+#define ENCRIPTO_CHACHA20_TAG_SIZE   16
 
-typedef struct encripto_chacha20_ctx encripto_chacha20_ctx;
-
-encripto_chacha20_ctx *encripto_chacha20_new(
+int encripto_chacha20_poly1305_encrypt(
     const uint8_t key[ENCRIPTO_CHACHA20_KEY_SIZE],
-    const uint8_t nonce[ENCRIPTO_CHACHA20_NONCE_SIZE]);
-void                   encripto_chacha20_free(encripto_chacha20_ctx *ctx);
-void                   encripto_chacha20_encrypt(encripto_chacha20_ctx *ctx,
-                                                  const uint8_t *in, size_t in_len,
-                                                  uint8_t *out);
-void                   encripto_chacha20_decrypt(encripto_chacha20_ctx *ctx,
-                                                  const uint8_t *in, size_t in_len,
-                                                  uint8_t *out);
+    const uint8_t nonce[ENCRIPTO_CHACHA20_NONCE_SIZE],
+    const uint8_t *pt, size_t len,
+    uint8_t *ct, uint8_t tag[ENCRIPTO_CHACHA20_TAG_SIZE]);
+int encripto_chacha20_poly1305_decrypt(
+    const uint8_t key[ENCRIPTO_CHACHA20_KEY_SIZE],
+    const uint8_t nonce[ENCRIPTO_CHACHA20_NONCE_SIZE],
+    const uint8_t *ct, size_t len,
+    const uint8_t tag[ENCRIPTO_CHACHA20_TAG_SIZE],
+    uint8_t *pt);
 
 /* ── RSA-4096 ────────────────────────────────────────────── */
 

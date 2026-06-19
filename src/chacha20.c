@@ -1,37 +1,28 @@
 #include "encripto.h"
-#include <stdlib.h>
 #include <string.h>
 
-struct encripto_chacha20_ctx {
-    uint8_t key[ENCRIPTO_CHACHA20_KEY_SIZE];
-    uint8_t nonce[ENCRIPTO_CHACHA20_NONCE_SIZE];
-};
-
-encripto_chacha20_ctx *encripto_chacha20_new(
+int encripto_chacha20_poly1305_encrypt(
     const uint8_t key[ENCRIPTO_CHACHA20_KEY_SIZE],
-    const uint8_t nonce[ENCRIPTO_CHACHA20_NONCE_SIZE]) {
-    encripto_chacha20_ctx *ctx = calloc(1, sizeof(*ctx));
-    if (ctx) {
-        memcpy(ctx->key, key, ENCRIPTO_CHACHA20_KEY_SIZE);
-        memcpy(ctx->nonce, nonce, ENCRIPTO_CHACHA20_NONCE_SIZE);
-    }
-    return ctx;
+    const uint8_t nonce[ENCRIPTO_CHACHA20_NONCE_SIZE],
+    const uint8_t *pt, size_t len,
+    uint8_t *ct, uint8_t tag[ENCRIPTO_CHACHA20_TAG_SIZE]) {
+    (void)key; (void)nonce;
+    if (!pt || !ct || !tag)
+        return ENCRIPTO_ERR_PARAM;
+    memcpy(ct, pt, len);
+    memset(tag, 0, ENCRIPTO_CHACHA20_TAG_SIZE);
+    return ENCRIPTO_OK;
 }
 
-void encripto_chacha20_free(encripto_chacha20_ctx *ctx) {
-    free(ctx);
-}
-
-void encripto_chacha20_encrypt(encripto_chacha20_ctx *ctx,
-                                const uint8_t *in, size_t in_len,
-                                uint8_t *out) {
-    (void)ctx;
-    memcpy(out, in, in_len);
-}
-
-void encripto_chacha20_decrypt(encripto_chacha20_ctx *ctx,
-                                const uint8_t *in, size_t in_len,
-                                uint8_t *out) {
-    (void)ctx;
-    memcpy(out, in, in_len);
+int encripto_chacha20_poly1305_decrypt(
+    const uint8_t key[ENCRIPTO_CHACHA20_KEY_SIZE],
+    const uint8_t nonce[ENCRIPTO_CHACHA20_NONCE_SIZE],
+    const uint8_t *ct, size_t len,
+    const uint8_t tag[ENCRIPTO_CHACHA20_TAG_SIZE],
+    uint8_t *pt) {
+    (void)key; (void)nonce; (void)tag;
+    if (!ct || !pt)
+        return ENCRIPTO_ERR_PARAM;
+    memcpy(pt, ct, len);
+    return ENCRIPTO_OK;
 }
