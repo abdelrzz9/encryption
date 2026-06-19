@@ -152,27 +152,4 @@ int encripto_sha256(const uint8_t *data, size_t len,
     return encripto_sha256_final(&ctx, digest);
 }
 
-/* ── SHA-512 placeholder (to be implemented) ─────────────── */
-
-struct encripto_sha512_ctx {
-    int placeholder;
-};
-
-encripto_sha512_ctx *encripto_sha512_new(void) {
-    return NULL;
-}
-
-void encripto_sha512_free(encripto_sha512_ctx *ctx) {
-    (void)ctx;
-}
-
-void encripto_sha512_update(encripto_sha512_ctx *ctx,
-                             const uint8_t *data, size_t len) {
-    (void)ctx; (void)data; (void)len;
-}
-
-void encripto_sha512_final(encripto_sha512_ctx *ctx,
-                            uint8_t out[ENCRIPTO_SHA512_DIGEST_SIZE]) {
-    memset(out, 0, ENCRIPTO_SHA512_DIGEST_SIZE);
-    (void)ctx;
-}
+/* ── SHA-512 (FIPS 180-4) ─────────────────────────────────── */

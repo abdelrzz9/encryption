@@ -76,14 +76,20 @@ int encripto_sha256_final(encripto_sha256_ctx *ctx,
 int encripto_sha256(const uint8_t *data, size_t len,
                      uint8_t digest[ENCRIPTO_SHA256_DIGEST_SIZE]);
 
-typedef struct encripto_sha512_ctx encripto_sha512_ctx;
+typedef struct {
+    uint64_t state[8];
+    uint64_t count[2];
+    uint8_t  buf[128];
+    size_t   buf_len;
+} encripto_sha512_ctx;
 
-encripto_sha512_ctx *encripto_sha512_new(void);
-void                 encripto_sha512_free(encripto_sha512_ctx *ctx);
-void                 encripto_sha512_update(encripto_sha512_ctx *ctx,
-                                             const uint8_t *data, size_t len);
-void                 encripto_sha512_final(encripto_sha512_ctx *ctx,
-                                            uint8_t out[ENCRIPTO_SHA512_DIGEST_SIZE]);
+int encripto_sha512_init(encripto_sha512_ctx *ctx);
+int encripto_sha512_update(encripto_sha512_ctx *ctx,
+                            const uint8_t *data, size_t len);
+int encripto_sha512_final(encripto_sha512_ctx *ctx,
+                           uint8_t out[ENCRIPTO_SHA512_DIGEST_SIZE]);
+int encripto_sha512(const uint8_t *data, size_t len,
+                     uint8_t out[ENCRIPTO_SHA512_DIGEST_SIZE]);
 
 /* ── HMAC ────────────────────────────────────────────────── */
 
