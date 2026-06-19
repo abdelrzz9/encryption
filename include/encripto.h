@@ -56,20 +56,27 @@ void                   encripto_chacha20_decrypt(encripto_chacha20_ctx *ctx,
                                                   const uint8_t *in, size_t in_len,
                                                   uint8_t *out);
 
-/* ── SHA-256 / SHA-512 ───────────────────────────────────── */
+/* ── SHA-256 (FIPS 180-4) ─────────────────────────────────── */
 
 #define ENCRIPTO_SHA256_DIGEST_SIZE 32
 #define ENCRIPTO_SHA512_DIGEST_SIZE 64
 
-typedef struct encripto_sha256_ctx encripto_sha256_ctx;
-typedef struct encripto_sha512_ctx encripto_sha512_ctx;
+typedef struct {
+    uint32_t state[8];
+    uint64_t bit_count;
+    uint8_t  buffer[64];
+    size_t   buffer_len;
+} encripto_sha256_ctx;
 
-encripto_sha256_ctx *encripto_sha256_new(void);
-void                 encripto_sha256_free(encripto_sha256_ctx *ctx);
-void                 encripto_sha256_update(encripto_sha256_ctx *ctx,
-                                             const uint8_t *data, size_t len);
-void                 encripto_sha256_final(encripto_sha256_ctx *ctx,
-                                            uint8_t out[ENCRIPTO_SHA256_DIGEST_SIZE]);
+int encripto_sha256_init(encripto_sha256_ctx *ctx);
+int encripto_sha256_update(encripto_sha256_ctx *ctx,
+                            const uint8_t *data, size_t len);
+int encripto_sha256_final(encripto_sha256_ctx *ctx,
+                           uint8_t digest[ENCRIPTO_SHA256_DIGEST_SIZE]);
+int encripto_sha256(const uint8_t *data, size_t len,
+                     uint8_t digest[ENCRIPTO_SHA256_DIGEST_SIZE]);
+
+typedef struct encripto_sha512_ctx encripto_sha512_ctx;
 
 encripto_sha512_ctx *encripto_sha512_new(void);
 void                 encripto_sha512_free(encripto_sha512_ctx *ctx);
