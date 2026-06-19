@@ -43,9 +43,19 @@ L'API est conçue pour être simple et sûre. [cite_start]Voici un exemple de ha
 ```c
 #include <encripto.h>
 
-// Hachage SHA-256
-uint8_t digest[32];
-encripto_sha256(data, data_len, digest);
+// Hachage SHA-256 / SHA-512
+uint8_t digest256[32];
+encripto_sha256(data, data_len, digest256);
+
+uint8_t digest512[64];
+encripto_sha512(data, data_len, digest512);
+
+// Hachage SHA-512 (streaming)
+encripto_sha512_ctx ctx;
+encripto_sha512_init(&ctx);
+encripto_sha512_update(&ctx, chunk1, len1);
+encripto_sha512_update(&ctx, chunk2, len2);
+encripto_sha512_final(&ctx, digest512);
 
 // Chiffrement AES-256-GCM
 uint8_t key[32], iv[12], tag[16];
