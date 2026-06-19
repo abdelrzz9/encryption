@@ -6,32 +6,67 @@ struct encripto_rsa_keypair {
     int placeholder;
 };
 
-encripto_rsa_keypair *encripto_rsa_generate(void) {
-    encripto_rsa_keypair *kp = calloc(1, sizeof(*kp));
-    (void)kp;
-    return kp;
+int encripto_rsa4096_keygen(encripto_rsa_keypair **kp) {
+    if (!kp)
+        return ENCRIPTO_ERR_PARAM;
+    *kp = calloc(1, sizeof(encripto_rsa_keypair));
+    if (!*kp)
+        return ENCRIPTO_ERR_NOMEM;
+    return ENCRIPTO_OK;
 }
 
-void encripto_rsa_free(encripto_rsa_keypair *kp) {
+int encripto_rsa4096_encrypt(const encripto_rsa_keypair *kp,
+                              const uint8_t *pt, size_t len,
+                              uint8_t *ct, size_t *ct_len) {
+    (void)kp;
+    if (!pt || !ct || !ct_len)
+        return ENCRIPTO_ERR_PARAM;
+    if (*ct_len < len)
+        return ENCRIPTO_ERR_PARAM;
+    memcpy(ct, pt, len);
+    *ct_len = len;
+    return ENCRIPTO_OK;
+}
+
+int encripto_rsa4096_decrypt(const encripto_rsa_keypair *kp,
+                              const uint8_t *ct, size_t len,
+                              uint8_t *pt, size_t *pt_len) {
+    (void)kp;
+    if (!ct || !pt || !pt_len)
+        return ENCRIPTO_ERR_PARAM;
+    if (*pt_len < len)
+        return ENCRIPTO_ERR_PARAM;
+    memcpy(pt, ct, len);
+    *pt_len = len;
+    return ENCRIPTO_OK;
+}
+
+int encripto_rsa4096_sign(const encripto_rsa_keypair *kp,
+                           const uint8_t *msg, size_t len,
+                           uint8_t *sig, size_t *sig_len) {
+    (void)kp;
+    if (!msg || !sig || !sig_len)
+        return ENCRIPTO_ERR_PARAM;
+    if (*sig_len < len)
+        return ENCRIPTO_ERR_PARAM;
+    memcpy(sig, msg, len);
+    *sig_len = len;
+    return ENCRIPTO_OK;
+}
+
+int encripto_rsa4096_verify(const encripto_rsa_keypair *kp,
+                             const uint8_t *msg, size_t len,
+                             const uint8_t *sig, size_t sig_len) {
+    (void)kp;
+    if (!msg || !sig)
+        return ENCRIPTO_ERR_PARAM;
+    if (len != sig_len)
+        return ENCRIPTO_ERR_AUTH;
+    if (memcmp(msg, sig, len) != 0)
+        return ENCRIPTO_ERR_AUTH;
+    return ENCRIPTO_OK;
+}
+
+void encripto_rsa_keypair_free(encripto_rsa_keypair *kp) {
     free(kp);
-}
-
-int encripto_rsa_encrypt(encripto_rsa_keypair *kp,
-                          const uint8_t *in, size_t in_len,
-                          uint8_t *out, size_t *out_len) {
-    (void)kp;
-    if (*out_len < in_len) return -1;
-    memcpy(out, in, in_len);
-    *out_len = in_len;
-    return 0;
-}
-
-int encripto_rsa_decrypt(encripto_rsa_keypair *kp,
-                          const uint8_t *in, size_t in_len,
-                          uint8_t *out, size_t *out_len) {
-    (void)kp;
-    if (*out_len < in_len) return -1;
-    memcpy(out, in, in_len);
-    *out_len = in_len;
-    return 0;
 }
