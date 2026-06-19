@@ -76,6 +76,8 @@ int encripto_sha256_final(encripto_sha256_ctx *ctx,
 int encripto_sha256(const uint8_t *data, size_t len,
                      uint8_t digest[ENCRIPTO_SHA256_DIGEST_SIZE]);
 
+typedef struct encripto_sha512_ctx encripto_sha512_ctx;
+
 encripto_sha512_ctx *encripto_sha512_new(void);
 void                 encripto_sha512_free(encripto_sha512_ctx *ctx);
 void                 encripto_sha512_update(encripto_sha512_ctx *ctx,
