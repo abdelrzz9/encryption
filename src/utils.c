@@ -1,11 +1,27 @@
 #include "encripto.h"
-#include <stdlib.h>
+#include <errno.h>
 #include <string.h>
+#include <sys/random.h>
 
-int encripto_random_bytes(uint8_t *buf, size_t len) {
-    (void)buf;
-    (void)len;
-    return -1;
+int encripto_rand_bytes(uint8_t *buf, size_t len) {
+    if (buf == NULL || len == 0)
+        return -EINVAL;
+
+    size_t total = 0;
+    while (total < len) {
+        ssize_t ret = getrandom(buf + total, len - total, 0);
+        if (ret < 0) {
+            if (errno == EINTR)
+                continue;
+            return -errno;
+        }
+        total += (size_t)ret;
+    }
+    return 0;
+}
+
+int encripto_rand_key(uint8_t *key, size_t key_len) {
+    return encripto_rand_bytes(key, key_len);
 }
 
 void encripto_hex_encode(const uint8_t *in, size_t in_len, char *out) {
