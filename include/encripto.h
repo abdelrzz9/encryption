@@ -106,7 +106,8 @@ int encripto_hmac_verify(const uint8_t *a, const uint8_t *b, size_t len);
 
 /* ── Utilities ───────────────────────────────────────────── */
 
-int  encripto_random_bytes(uint8_t *buf, size_t len);
+int  encripto_rand_bytes(uint8_t *buf, size_t len);
+int  encripto_rand_key(uint8_t *key, size_t key_len);
 void encripto_hex_encode(const uint8_t *in, size_t in_len, char *out);
 int  encripto_hex_decode(const char *in, uint8_t *out, size_t *out_len);
 void encripto_base64_encode(const uint8_t *in, size_t in_len, char *out);
