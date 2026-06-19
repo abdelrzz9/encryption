@@ -11,29 +11,29 @@ static int failed = 0;
     } \
 } while (0)
 
-static void test_chacha20_encrypt_decrypt(void) {
+static void test_chacha20_poly1305_encrypt_decrypt(void) {
     uint8_t key[ENCRIPTO_CHACHA20_KEY_SIZE] = {0};
     uint8_t nonce[ENCRIPTO_CHACHA20_NONCE_SIZE] = {0};
     uint8_t pt[32] = {0};
     uint8_t ct[32];
     uint8_t dec[32];
+    uint8_t tag[ENCRIPTO_CHACHA20_TAG_SIZE];
 
-    encripto_chacha20_ctx *ctx = encripto_chacha20_new(key, nonce);
-    TEST("chacha20_ctx_alloc", ctx != NULL);
+    int ret = encripto_chacha20_poly1305_encrypt(key, nonce, pt, sizeof(pt), ct, tag);
+    TEST("chacha20_poly1305_encrypt_ok", ret == ENCRIPTO_OK);
 
-    encripto_chacha20_encrypt(ctx, pt, 32, ct);
-    encripto_chacha20_decrypt(ctx, ct, 32, dec);
-    TEST("chacha20_roundtrip", memcmp(pt, dec, 32) == 0);
+    ret = encripto_chacha20_poly1305_decrypt(key, nonce, ct, sizeof(pt), tag, dec);
+    TEST("chacha20_poly1305_decrypt_ok", ret == ENCRIPTO_OK);
 
-    encripto_chacha20_free(ctx);
+    TEST("chacha20_poly1305_roundtrip", memcmp(pt, dec, sizeof(pt)) == 0);
 }
 
 int main(void) {
-    test_chacha20_encrypt_decrypt();
+    test_chacha20_poly1305_encrypt_decrypt();
     if (failed) {
-        printf("ChaCha20 tests: FAILED\n");
+        printf("ChaCha20-Poly1305 tests: FAILED\n");
         return 1;
     }
-    printf("ChaCha20 tests: PASSED\n");
+    printf("ChaCha20-Poly1305 tests: PASSED\n");
     return 0;
 }

@@ -122,18 +122,25 @@ int encripto_chacha20_poly1305_decrypt(
 
 /* ── RSA-4096 ────────────────────────────────────────────── */
 
-#define ENCRIPTO_RSA_KEY_SIZE 4096
+#define ENCRIPTO_RSA_KEY_SIZE      4096
+#define ENCRIPTO_RSA4096_KEY_SIZE  4096
 
 typedef struct encripto_rsa_keypair encripto_rsa_keypair;
 
-encripto_rsa_keypair *encripto_rsa_generate(void);
-void                  encripto_rsa_free(encripto_rsa_keypair *kp);
-int                   encripto_rsa_encrypt(encripto_rsa_keypair *kp,
-                                            const uint8_t *in, size_t in_len,
-                                            uint8_t *out, size_t *out_len);
-int                   encripto_rsa_decrypt(encripto_rsa_keypair *kp,
-                                            const uint8_t *in, size_t in_len,
-                                            uint8_t *out, size_t *out_len);
+int  encripto_rsa4096_keygen(encripto_rsa_keypair **kp);
+int  encripto_rsa4096_encrypt(const encripto_rsa_keypair *kp,
+                               const uint8_t *pt, size_t len,
+                               uint8_t *ct, size_t *ct_len);
+int  encripto_rsa4096_decrypt(const encripto_rsa_keypair *kp,
+                               const uint8_t *ct, size_t len,
+                               uint8_t *pt, size_t *pt_len);
+int  encripto_rsa4096_sign(const encripto_rsa_keypair *kp,
+                            const uint8_t *msg, size_t len,
+                            uint8_t *sig, size_t *sig_len);
+int  encripto_rsa4096_verify(const encripto_rsa_keypair *kp,
+                              const uint8_t *msg, size_t len,
+                              const uint8_t *sig, size_t sig_len);
+void encripto_rsa_keypair_free(encripto_rsa_keypair *kp);
 
 /* ── Random number generation ────────────────────────────── */
 
