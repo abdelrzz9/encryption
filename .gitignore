@@ -57,3 +57,5 @@ dkms.conf
 # Project binaries
 /encripto
 /tests/test_*
+!/tests/test_*.c
+!/tests/test_*.h
