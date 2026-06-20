@@ -247,6 +247,59 @@ int encripto_aes256_gcm_decrypt(const uint8_t key[ENCRIPTO_AES256_KEY_SIZE],
                                  const uint8_t tag[ENCRIPTO_AES256_GCM_TAG_SIZE],
                                  uint8_t *pt);
 
+/** Number of round key words in AES-256 expanded key schedule. */
+#define ENCRIPTO_AES256_ROUND_KEYS 60
+
+/** AES-256 opaque context (defined in src/aes.c). */
+typedef struct encripto_aes256_ctx encripto_aes256_ctx;
+
+/** Create an AES-256 context and expand the key schedule.
+ *  @param key  32-byte key.
+ *  @return Pointer to allocated context, or NULL on allocation failure.
+ */
+encripto_aes256_ctx *encripto_aes256_new(
+    const uint8_t key[ENCRIPTO_AES256_KEY_SIZE]);
+
+/** Free an AES-256 context after zeroising sensitive key material.
+ *  @param ctx  Context to free (may be NULL).
+ */
+void encripto_aes256_free(encripto_aes256_ctx *ctx);
+
+/** AES-256 block cipher encryption (ECB).
+ *  Encrypts a single block with the expanded key schedule.
+ *  @param ctx  Initialised context.
+ *  @param in   16-byte plaintext block.
+ *  @param out  16-byte ciphertext block.
+ */
+void encripto_aes256_encrypt(encripto_aes256_ctx *ctx,
+                              const uint8_t in[ENCRIPTO_AES256_BLOCK_SIZE],
+                              uint8_t out[ENCRIPTO_AES256_BLOCK_SIZE]);
+
+/** AES-256 block cipher decryption (ECB).
+ *  Decrypts a single block with the expanded key schedule.
+ *  @param ctx  Initialised context.
+ *  @param in   16-byte ciphertext block.
+ *  @param out  16-byte plaintext block.
+ */
+void encripto_aes256_decrypt(encripto_aes256_ctx *ctx,
+                              const uint8_t in[ENCRIPTO_AES256_BLOCK_SIZE],
+                              uint8_t out[ENCRIPTO_AES256_BLOCK_SIZE]);
+
+/** Expand a 32-byte AES-256 key into 60 round key words (FIPS 197).
+ *  @param key         32-byte key.
+ *  @param round_keys  Output array (ENCRIPTO_AES256_ROUND_KEYS words).
+ *  @return ENCRIPTO_OK on success, ENCRIPTO_ERR_PARAM on NULL input.
+ */
+int  encripto_aes256_key_expand(
+    const uint8_t key[ENCRIPTO_AES256_KEY_SIZE],
+    uint32_t round_keys[ENCRIPTO_AES256_ROUND_KEYS]);
+
+/** Zeroise expanded round keys with a volatile pointer.
+ *  @param round_keys  Array to clear (may be NULL).
+ */
+void encripto_aes256_key_clear(
+    uint32_t round_keys[ENCRIPTO_AES256_ROUND_KEYS]);
+
 /* ── ChaCha20-Poly1305 ───────────────────────────────────── */
 
 /** ChaCha20 key size in bytes. */
