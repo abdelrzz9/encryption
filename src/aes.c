@@ -2,19 +2,65 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ── AES-CBC stubs (to be implemented) ────────────────────── */
+/* ── PKCS#7 padding helpers ──────────────────────────────── */
+
+static size_t pkcs7_padded_len(size_t msg_len) {
+    return msg_len + 16 - (msg_len % 16);
+}
+
+static void pkcs7_pad(uint8_t *buf, size_t msg_len) {
+    uint8_t pad = 16 - (uint8_t)(msg_len % 16);
+    for (uint8_t i = 0; i < pad; i++)
+        buf[msg_len + i] = pad;
+}
+
+static int pkcs7_unpad(const uint8_t *buf, size_t len, size_t *out_len) {
+    if (len == 0 || len % 16 != 0)
+        return -1;
+    uint8_t pad = buf[len - 1];
+    if (pad == 0 || pad > 16)
+        return -1;
+    uint8_t bad = 0;
+    for (uint8_t i = 1; i <= pad; i++)
+        bad |= buf[len - i] ^ pad;
+    if (bad)
+        return -1;
+    *out_len = len - pad;
+    return 0;
+}
+
+/* ── AES-CBC ──────────────────────────────────────────────── */
 
 int encripto_aes256_cbc_encrypt(const uint8_t key[ENCRIPTO_AES256_KEY_SIZE],
                                  const uint8_t iv[ENCRIPTO_AES256_IV_SIZE],
                                  const uint8_t *pt, size_t len,
                                  uint8_t *ct, size_t *ct_len) {
-    (void)key; (void)iv;
-    if (!pt || !ct || !ct_len)
+    if (!key || !iv || !pt || !ct || !ct_len)
         return ENCRIPTO_ERR_PARAM;
-    if (*ct_len < len)
+
+    size_t padded_len = pkcs7_padded_len(len);
+    if (*ct_len < padded_len)
         return ENCRIPTO_ERR_PARAM;
-    memcpy(ct, pt, len);
-    *ct_len = len;
+    *ct_len = padded_len;
+
+    uint8_t padded[padded_len];
+    memcpy(padded, pt, len);
+    pkcs7_pad(padded, len);
+
+    encripto_aes256_ctx *ctx = encripto_aes256_new(key);
+    if (!ctx)
+        return ENCRIPTO_ERR_NOMEM;
+
+    const uint8_t *prev = iv;
+    for (size_t i = 0; i < padded_len; i += 16) {
+        uint8_t tmp[16];
+        for (int j = 0; j < 16; j++)
+            tmp[j] = padded[i + j] ^ prev[j];
+        encripto_aes256_encrypt(ctx, tmp, ct + i);
+        prev = ct + i;
+    }
+
+    encripto_aes256_free(ctx);
     return ENCRIPTO_OK;
 }
 
@@ -22,13 +68,32 @@ int encripto_aes256_cbc_decrypt(const uint8_t key[ENCRIPTO_AES256_KEY_SIZE],
                                  const uint8_t iv[ENCRIPTO_AES256_IV_SIZE],
                                  const uint8_t *ct, size_t ct_len,
                                  uint8_t *pt, size_t *pt_len) {
-    (void)key; (void)iv;
-    if (!ct || !pt || !pt_len)
+    if (!key || !iv || !ct || !pt || !pt_len)
+        return ENCRIPTO_ERR_PARAM;
+    if (ct_len == 0 || ct_len % 16 != 0)
         return ENCRIPTO_ERR_PARAM;
     if (*pt_len < ct_len)
         return ENCRIPTO_ERR_PARAM;
-    memcpy(pt, ct, ct_len);
-    *pt_len = ct_len;
+
+    encripto_aes256_ctx *ctx = encripto_aes256_new(key);
+    if (!ctx)
+        return ENCRIPTO_ERR_NOMEM;
+
+    uint8_t *dec = pt;
+    const uint8_t *prev = iv;
+    for (size_t i = 0; i < ct_len; i += 16) {
+        encripto_aes256_decrypt(ctx, ct + i, dec + i);
+        for (int j = 0; j < 16; j++)
+            dec[i + j] ^= prev[j];
+        prev = ct + i;
+    }
+
+    encripto_aes256_free(ctx);
+
+    size_t unpadded_len;
+    if (pkcs7_unpad(dec, ct_len, &unpadded_len) != 0)
+        return ENCRIPTO_ERR_PARAM;
+    *pt_len = unpadded_len;
     return ENCRIPTO_OK;
 }
 
