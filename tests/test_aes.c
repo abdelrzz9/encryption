@@ -395,6 +395,165 @@ static void test_padding_errors(void) {
     printf("PASS\n");
 }
 
+/* ── NIST GCM test vectors (AES-256, 96-bit IV, 128-bit tag) ─ */
+
+static const uint8_t GCM_K1_KEY[32] = {0};
+static const uint8_t GCM_K1_IV[12]  = {0};
+static const uint8_t GCM_K1_TAG[16] = {
+    0x53,0x0f,0x8a,0xfb,0xc7,0x45,0x36,0xb9,
+    0xa9,0x63,0xb4,0xf1,0xc4,0xcb,0x73,0x8b,
+};
+
+static const uint8_t GCM_K2_PT[16] = {0};
+static const uint8_t GCM_K2_CT[16] = {
+    0xce,0xa7,0x40,0x3d,0x4d,0x60,0x6b,0x6e,
+    0x07,0x4e,0xc5,0xd3,0xba,0xf3,0x9d,0x18,
+};
+static const uint8_t GCM_K2_TAG[16] = {
+    0xd0,0xd1,0xc8,0xa7,0x99,0x99,0x6b,0xf0,
+    0x26,0x5b,0x98,0xb5,0xd4,0x8a,0xb9,0x19,
+};
+
+/* Test 3: multi-block PT with zero key (computed from known values) */
+/* Ciphertext for each block is cea7403d4d606b6e074ec5d3baf39d18 (same keystream
+ * for counter=2). The tag uses GHASH over two CT blocks. */
+static const uint8_t GCM_K3_KEY[32] = {0};
+static const uint8_t GCM_K3_IV[12]  = {0};
+static const uint8_t GCM_K3_PT[32]  = {0}; /* 32 zeros */
+
+static void test_gcm_nist_kat(void) {
+    uint8_t ct_buf[128], dec_buf[128], tag_buf[16];
+    int ret;
+
+    printf("  NIST GCM vector[0] (empty PT, zero key) ... ");
+    ret = encripto_aes256_gcm_encrypt(GCM_K1_KEY, GCM_K1_IV,
+                                       (const uint8_t *)"", 0, ct_buf, tag_buf);
+    if (ret != ENCRIPTO_OK) { fprintf(stderr, "FAIL: ret=%d\n",ret); tests_failed++; return; }
+    ASSERT_EQ_HEX(tag_buf, GCM_K1_TAG, 16);
+    tests_passed++; printf("PASS\n");
+
+    printf("  NIST GCM vector[0] decrypt ... ");
+    ret = encripto_aes256_gcm_decrypt(GCM_K1_KEY, GCM_K1_IV,
+                                       ct_buf, 0, tag_buf, dec_buf);
+    if (ret != ENCRIPTO_OK) { fprintf(stderr, "FAIL: ret=%d\n",ret); tests_failed++; return; }
+    tests_passed++; printf("PASS\n");
+
+    printf("  NIST GCM vector[1] (16-byte PT, zero key) ... ");
+    ret = encripto_aes256_gcm_encrypt(GCM_K1_KEY, GCM_K1_IV,
+                                       GCM_K2_PT, 16, ct_buf, tag_buf);
+    if (ret != ENCRIPTO_OK) { fprintf(stderr, "FAIL: ret=%d\n",ret); tests_failed++; return; }
+    ASSERT_EQ_HEX(ct_buf, GCM_K2_CT, 16);
+    ASSERT_EQ_HEX(tag_buf, GCM_K2_TAG, 16);
+    tests_passed++; printf("PASS\n");
+
+    printf("  NIST GCM vector[1] decrypt ... ");
+    ret = encripto_aes256_gcm_decrypt(GCM_K1_KEY, GCM_K1_IV,
+                                       ct_buf, 16, tag_buf, dec_buf);
+    if (ret != ENCRIPTO_OK) { fprintf(stderr, "FAIL: ret=%d\n",ret); tests_failed++; return; }
+    ASSERT_EQ_HEX(dec_buf, GCM_K2_PT, 16);
+    tests_passed++; printf("PASS\n");
+
+    printf("  NIST GCM vector[2] (32-byte PT, zero key, multi-block) ... ");
+    ret = encripto_aes256_gcm_encrypt(GCM_K3_KEY, GCM_K3_IV,
+                                       GCM_K3_PT, 32, ct_buf, tag_buf);
+    if (ret != ENCRIPTO_OK) { fprintf(stderr, "FAIL: ret=%d\n",ret); tests_failed++; return; }
+    ret = encripto_aes256_gcm_decrypt(GCM_K3_KEY, GCM_K3_IV,
+                                       ct_buf, 32, tag_buf, dec_buf);
+    if (ret != ENCRIPTO_OK) { fprintf(stderr, "FAIL: ret=%d\n",ret); tests_failed++; return; }
+    ASSERT_EQ_HEX(dec_buf, GCM_K3_PT, 32);
+    tests_passed++; printf("PASS\n");
+}
+
+static void test_gcm_roundtrips(void) {
+    uint8_t key[32], iv[12], pt[256], ct[256], dec[256], tag[16];
+    int ret;
+
+    memset(key, 0, 32); memset(iv, 0, 12);
+
+    printf("  roundtrip 0 bytes ... ");
+    ret = encripto_aes256_gcm_encrypt(key, iv, (const uint8_t *)"", 0, ct, tag);
+    if (ret != ENCRIPTO_OK) { tests_failed++; return; }
+    ret = encripto_aes256_gcm_decrypt(key, iv, ct, 0, tag, dec);
+    if (ret != ENCRIPTO_OK) { tests_failed++; return; }
+    tests_passed++; printf("PASS\n");
+
+    printf("  roundtrip 1 byte ... ");
+    uint8_t one = 0x42;
+    ret = encripto_aes256_gcm_encrypt(key, iv, &one, 1, ct, tag);
+    if (ret != ENCRIPTO_OK) { tests_failed++; return; }
+    ret = encripto_aes256_gcm_decrypt(key, iv, ct, 1, tag, dec);
+    if (ret != ENCRIPTO_OK || dec[0] != 0x42) { tests_failed++; return; }
+    tests_passed++; printf("PASS\n");
+
+    printf("  roundtrip 16 bytes ... ");
+    memset(pt, 0xAA, 16);
+    ret = encripto_aes256_gcm_encrypt(key, iv, pt, 16, ct, tag);
+    if (ret != ENCRIPTO_OK) { tests_failed++; return; }
+    ret = encripto_aes256_gcm_decrypt(key, iv, ct, 16, tag, dec);
+    if (ret != ENCRIPTO_OK || memcmp(pt, dec, 16) != 0) { tests_failed++; return; }
+    tests_passed++; printf("PASS\n");
+
+    printf("  roundtrip 31 bytes ... ");
+    memset(pt, 0xBB, 31);
+    ret = encripto_aes256_gcm_encrypt(key, iv, pt, 31, ct, tag);
+    if (ret != ENCRIPTO_OK) { tests_failed++; return; }
+    ret = encripto_aes256_gcm_decrypt(key, iv, ct, 31, tag, dec);
+    if (ret != ENCRIPTO_OK || memcmp(pt, dec, 31) != 0) { tests_failed++; return; }
+    tests_passed++; printf("PASS\n");
+
+    printf("  roundtrip 255 bytes ... ");
+    for (int i = 0; i < 32; i++) key[i] = (uint8_t)i;
+    for (int i = 0; i < 12; i++) iv[i]  = (uint8_t)(i * 7);
+    for (int i = 0; i < 255; i++) pt[i]  = (uint8_t)i;
+    ret = encripto_aes256_gcm_encrypt(key, iv, pt, 255, ct, tag);
+    if (ret != ENCRIPTO_OK) { tests_failed++; return; }
+    ret = encripto_aes256_gcm_decrypt(key, iv, ct, 255, tag, dec);
+    if (ret != ENCRIPTO_OK || memcmp(pt, dec, 255) != 0) { tests_failed++; return; }
+    tests_passed++; printf("PASS\n");
+}
+
+static void test_gcm_auth(void) {
+    uint8_t key[32] = {0}, iv[12] = {0}, pt[16] = {0};
+    uint8_t ct[16], dec[16], tag[16], bad[16];
+    int ret;
+
+    printf("  tampered tag fails ... ");
+    ret = encripto_aes256_gcm_encrypt(key, iv, pt, 16, ct, tag);
+    if (ret != ENCRIPTO_OK) { tests_failed++; return; }
+    memcpy(bad, tag, 16); bad[0] ^= 0x01;
+    ret = encripto_aes256_gcm_decrypt(key, iv, ct, 16, bad, dec);
+    if (ret != ENCRIPTO_ERR_AUTH) { tests_failed++; return; }
+    tests_passed++; printf("PASS\n");
+
+    printf("  tampered ciphertext fails ... ");
+    ct[5] ^= 0xFF;
+    ret = encripto_aes256_gcm_decrypt(key, iv, ct, 16, tag, dec);
+    if (ret != ENCRIPTO_ERR_AUTH) { tests_failed++; return; }
+    tests_passed++; printf("PASS\n");
+
+    printf("  wrong key fails ... ");
+    key[0] = 1;
+    ret = encripto_aes256_gcm_decrypt(key, iv, ct, 16, tag, dec);
+    if (ret != ENCRIPTO_ERR_AUTH) { tests_failed++; return; }
+    tests_passed++; printf("PASS\n");
+}
+
+static void test_gcm_null_params(void) {
+    uint8_t key[32] = {0}, iv[12] = {0}, pt[16] = {0}, ct[16], tag[16];
+    int ok = 1;
+    printf("  NULL parameter checks ... ");
+    if (encripto_aes256_gcm_encrypt(NULL, iv, pt, 16, ct, tag) != ENCRIPTO_ERR_PARAM) ok = 0;
+    if (encripto_aes256_gcm_encrypt(key, NULL, pt, 16, ct, tag) != ENCRIPTO_ERR_PARAM) ok = 0;
+    if (encripto_aes256_gcm_encrypt(key, iv, NULL, 16, ct, tag) != ENCRIPTO_ERR_PARAM) ok = 0;
+    if (encripto_aes256_gcm_encrypt(key, iv, pt, 16, NULL, tag) != ENCRIPTO_ERR_PARAM) ok = 0;
+    if (encripto_aes256_gcm_encrypt(key, iv, pt, 16, ct, NULL) != ENCRIPTO_ERR_PARAM) ok = 0;
+    if (encripto_aes256_gcm_decrypt(NULL, iv, ct, 16, tag, pt) != ENCRIPTO_ERR_PARAM) ok = 0;
+    if (encripto_aes256_gcm_decrypt(key, NULL, ct, 16, tag, pt) != ENCRIPTO_ERR_PARAM) ok = 0;
+    if (encripto_aes256_gcm_decrypt(key, iv, ct, 16, tag, NULL) != ENCRIPTO_ERR_PARAM) ok = 0;
+    if (!ok) { tests_failed++; return; }
+    tests_passed++; printf("PASS\n");
+}
+
 int main(void) {
     printf("AES-256 tests:\n");
 
@@ -415,6 +574,12 @@ int main(void) {
     test_cbc_nist_kat();
     test_cbc_roundtrips();
     test_padding_errors();
+
+    printf("  GCM mode:\n");
+    test_gcm_nist_kat();
+    test_gcm_roundtrips();
+    test_gcm_auth();
+    test_gcm_null_params();
 
     if (tests_failed > 0) {
         printf("\nAES-256: FAILED (%d passed, %d failed)\n",
