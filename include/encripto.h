@@ -333,34 +333,41 @@ int encripto_chacha20_encrypt(const uint8_t key[ENCRIPTO_CHACHA20_KEY_SIZE],
 #define ENCRIPTO_CHACHA20_TAG_SIZE   16
 
 /** Encrypt and authenticate plaintext with ChaCha20-Poly1305 (RFC 8439).
- *  @param key   32-byte key.
- *  @param nonce 12-byte nonce.
- *  @param pt    Plaintext input.
- *  @param len   Plaintext length in bytes.
- *  @param ct    Ciphertext output (same length as pt).
- *  @param tag   16-byte authentication tag output.
+ *  @param key     32-byte key.
+ *  @param nonce   12-byte nonce.
+ *  @param pt      Plaintext input.
+ *  @param pt_len  Plaintext length in bytes.
+ *  @param aad     Additional authenticated data (may be NULL if aad_len == 0).
+ *  @param aad_len AAD length in bytes.
+ *  @param ct      Ciphertext output (same length as pt).
+ *  @param tag     16-byte authentication tag output.
  *  @return ENCRIPTO_OK on success, ENCRIPTO_ERR_PARAM on invalid args.
  */
 int encripto_chacha20_poly1305_encrypt(
     const uint8_t key[ENCRIPTO_CHACHA20_KEY_SIZE],
     const uint8_t nonce[ENCRIPTO_CHACHA20_NONCE_SIZE],
-    const uint8_t *pt, size_t len,
+    const uint8_t *pt, size_t pt_len,
+    const uint8_t *aad, size_t aad_len,
     uint8_t *ct, uint8_t tag[ENCRIPTO_CHACHA20_TAG_SIZE]);
 
 /** Decrypt and verify authenticity with ChaCha20-Poly1305 (RFC 8439).
- *  @param key   32-byte key.
- *  @param nonce 12-byte nonce.
- *  @param ct    Ciphertext input (same length as pt).
- *  @param len   Ciphertext length in bytes.
- *  @param tag   16-byte authentication tag (must match).
- *  @param pt    Plaintext output (same length as ct).
+ *  Tag is verified BEFORE plaintext is written (encrypt-then-MAC).
+ *  @param key     32-byte key.
+ *  @param nonce   12-byte nonce.
+ *  @param ct      Ciphertext input (same length as pt).
+ *  @param ct_len  Ciphertext length in bytes.
+ *  @param aad     Additional authenticated data (may be NULL if aad_len == 0).
+ *  @param aad_len AAD length in bytes.
+ *  @param tag     16-byte authentication tag (must match).
+ *  @param pt      Plaintext output (same length as ct).
  *  @return ENCRIPTO_OK on success, ENCRIPTO_ERR_AUTH on tag mismatch,
  *          ENCRIPTO_ERR_PARAM on invalid args.
  */
 int encripto_chacha20_poly1305_decrypt(
     const uint8_t key[ENCRIPTO_CHACHA20_KEY_SIZE],
     const uint8_t nonce[ENCRIPTO_CHACHA20_NONCE_SIZE],
-    const uint8_t *ct, size_t len,
+    const uint8_t *ct, size_t ct_len,
+    const uint8_t *aad, size_t aad_len,
     const uint8_t tag[ENCRIPTO_CHACHA20_TAG_SIZE],
     uint8_t *pt);
 

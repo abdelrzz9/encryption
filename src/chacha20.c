@@ -352,30 +352,122 @@ int encripto_chacha20_encrypt(const uint8_t key[ENCRIPTO_CHACHA20_KEY_SIZE],
     return ENCRIPTO_OK;
 }
 
-/* ── ChaCha20-Poly1305 stubs (to be implemented) ──────────── */
+/* ── ChaCha20-Poly1305 AEAD (RFC 8439 Section 2.8) ────────── */
+
+static inline size_t pad16(size_t len) {
+    return (16 - len % 16) % 16;
+}
 
 int encripto_chacha20_poly1305_encrypt(
     const uint8_t key[ENCRIPTO_CHACHA20_KEY_SIZE],
     const uint8_t nonce[ENCRIPTO_CHACHA20_NONCE_SIZE],
-    const uint8_t *pt, size_t len,
+    const uint8_t *pt, size_t pt_len,
+    const uint8_t *aad, size_t aad_len,
     uint8_t *ct, uint8_t tag[ENCRIPTO_CHACHA20_TAG_SIZE]) {
-    (void)key; (void)nonce;
-    if (!pt || !ct || !tag)
+
+    if (!key || !nonce || !pt || !ct || !tag)
         return ENCRIPTO_ERR_PARAM;
-    memcpy(ct, pt, len);
-    memset(tag, 0, ENCRIPTO_CHACHA20_TAG_SIZE);
+    if ((aad == NULL && aad_len > 0) || (aad_len > 0 && aad == NULL))
+        return ENCRIPTO_ERR_PARAM;
+
+    /* ── Derive Poly1305 key (counter=0) ─────────────────── */
+    uint8_t poly_key[32] = {0};
+    encripto_chacha20_encrypt(key, 0, nonce, poly_key, 32, poly_key);
+
+    /* ── Encrypt (counter=1) ────────────────────────────── */
+    encripto_chacha20_encrypt(key, 1, nonce, pt, pt_len, ct);
+
+    /* ── Poly1305 over [AAD][pad][CT][pad][lenAAD][lenCT] ─ */
+    encripto_poly1305_ctx ctx;
+    encripto_poly1305_init(&ctx, poly_key);
+
+    if (aad_len > 0)
+        encripto_poly1305_update(&ctx, aad, aad_len);
+    size_t pad_aad = pad16(aad_len);
+    if (pad_aad > 0) {
+        static const uint8_t zeros[16] = {0};
+        encripto_poly1305_update(&ctx, zeros, pad_aad);
+    }
+
+    if (pt_len > 0)
+        encripto_poly1305_update(&ctx, ct, pt_len);
+    size_t pad_ct = pad16(pt_len);
+    if (pad_ct > 0) {
+        static const uint8_t zeros[16] = {0};
+        encripto_poly1305_update(&ctx, zeros, pad_ct);
+    }
+
+    uint8_t lenbuf[8];
+    store64_le(lenbuf, aad_len);
+    encripto_poly1305_update(&ctx, lenbuf, 8);
+
+    store64_le(lenbuf, pt_len);
+    encripto_poly1305_update(&ctx, lenbuf, 8);
+
+    encripto_poly1305_final(&ctx, tag);
+
     return ENCRIPTO_OK;
 }
 
 int encripto_chacha20_poly1305_decrypt(
     const uint8_t key[ENCRIPTO_CHACHA20_KEY_SIZE],
     const uint8_t nonce[ENCRIPTO_CHACHA20_NONCE_SIZE],
-    const uint8_t *ct, size_t len,
+    const uint8_t *ct, size_t ct_len,
+    const uint8_t *aad, size_t aad_len,
     const uint8_t tag[ENCRIPTO_CHACHA20_TAG_SIZE],
     uint8_t *pt) {
-    (void)key; (void)nonce; (void)tag;
-    if (!ct || !pt)
+
+    if (!key || !nonce || !ct || !tag || !pt)
         return ENCRIPTO_ERR_PARAM;
-    memcpy(pt, ct, len);
+    if ((aad == NULL && aad_len > 0) || (aad_len > 0 && aad == NULL))
+        return ENCRIPTO_ERR_PARAM;
+
+    /* ── Derive Poly1305 key (counter=0) ─────────────────── */
+    uint8_t poly_key[32] = {0};
+    encripto_chacha20_encrypt(key, 0, nonce, poly_key, 32, poly_key);
+
+    /* ── Compute expected tag ───────────────────────────── */
+    encripto_poly1305_ctx ctx;
+    encripto_poly1305_init(&ctx, poly_key);
+
+    if (aad_len > 0)
+        encripto_poly1305_update(&ctx, aad, aad_len);
+    size_t pad_aad = pad16(aad_len);
+    if (pad_aad > 0) {
+        static const uint8_t zeros[16] = {0};
+        encripto_poly1305_update(&ctx, zeros, pad_aad);
+    }
+
+    if (ct_len > 0)
+        encripto_poly1305_update(&ctx, ct, ct_len);
+    size_t pad_ct = pad16(ct_len);
+    if (pad_ct > 0) {
+        static const uint8_t zeros[16] = {0};
+        encripto_poly1305_update(&ctx, zeros, pad_ct);
+    }
+
+    uint8_t lenbuf[8];
+    store64_le(lenbuf, aad_len);
+    encripto_poly1305_update(&ctx, lenbuf, 8);
+
+    store64_le(lenbuf, ct_len);
+    encripto_poly1305_update(&ctx, lenbuf, 8);
+
+    uint8_t computed_tag[ENCRIPTO_CHACHA20_TAG_SIZE];
+    encripto_poly1305_final(&ctx, computed_tag);
+
+    /* ── Constant-time tag comparison (encrypt-then-MAC) ── */
+    uint8_t diff = 0;
+    for (size_t i = 0; i < ENCRIPTO_CHACHA20_TAG_SIZE; i++)
+        diff |= tag[i] ^ computed_tag[i];
+
+    if (diff != 0) {
+        memset(computed_tag, 0, sizeof(computed_tag));
+        return ENCRIPTO_ERR_AUTH;
+    }
+
+    /* ── Decrypt (counter=1) ────────────────────────────── */
+    encripto_chacha20_encrypt(key, 1, nonce, ct, ct_len, pt);
+
     return ENCRIPTO_OK;
 }
