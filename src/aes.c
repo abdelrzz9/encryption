@@ -97,30 +97,178 @@ int encripto_aes256_cbc_decrypt(const uint8_t key[ENCRIPTO_AES256_KEY_SIZE],
     return ENCRIPTO_OK;
 }
 
-/* ── AES-GCM stubs (to be implemented) ────────────────────── */
+/* ── GCM helpers ───────────────────────────────────────────── */
+
+static void write_be64(uint8_t *p, uint64_t v) {
+    p[0] = (uint8_t)(v >> 56);
+    p[1] = (uint8_t)(v >> 48);
+    p[2] = (uint8_t)(v >> 40);
+    p[3] = (uint8_t)(v >> 32);
+    p[4] = (uint8_t)(v >> 24);
+    p[5] = (uint8_t)(v >> 16);
+    p[6] = (uint8_t)(v >>  8);
+    p[7] = (uint8_t)(v);
+}
+
+static void inc32(uint8_t block[16]) {
+    for (int i = 15; i >= 12; i--)
+        if (++block[i] != 0) break;
+}
+
+static void aes256_ctr_crypt(encripto_aes256_ctx *ctx,
+                              const uint8_t nonce[12],
+                              const uint8_t *in, size_t len,
+                              uint8_t *out,
+                              uint32_t initial_ctr)
+{
+    uint8_t counter[16];
+    memcpy(counter, nonce, 12);
+    counter[12] = (uint8_t)(initial_ctr >> 24);
+    counter[13] = (uint8_t)(initial_ctr >> 16);
+    counter[14] = (uint8_t)(initial_ctr >>  8);
+    counter[15] = (uint8_t)(initial_ctr);
+
+    for (size_t i = 0; i < len; i += 16) {
+        uint8_t keystream[16];
+        encripto_aes256_encrypt(ctx, counter, keystream);
+
+        size_t block_len = (len - i < 16) ? len - i : 16;
+        for (size_t j = 0; j < block_len; j++)
+            out[i + j] = in[i + j] ^ keystream[j];
+
+        inc32(counter);
+    }
+}
+
+/* ── GF(2^128) multiplication (NIST SP 800-38D Algorithm 1) ─ */
+
+static void gf128_mul(const uint8_t X[16], const uint8_t Y[16],
+                       uint8_t Z[16])
+{
+    uint8_t V[16], result[16];
+    memcpy(V, Y, 16);
+    memset(result, 0, 16);
+
+    for (int i = 0; i < 128; i++) {
+        if (X[i / 8] & (0x80 >> (i % 8))) {
+            for (int j = 0; j < 16; j++)
+                result[j] ^= V[j];
+        }
+        uint8_t lsb = V[15] & 1;
+        for (int j = 15; j > 0; j--)
+            V[j] = (V[j] >> 1) | (V[j - 1] << 7);
+        V[0] >>= 1;
+        if (lsb)
+            V[0] ^= 0xe1;
+    }
+    memcpy(Z, result, 16);
+}
+
+/* ── GHASH core (NIST SP 800-38D Section 6.4) ─────────────── */
+
+static void ghash_update(uint8_t S[16], const uint8_t H[16],
+                          const uint8_t *data, size_t len)
+{
+    uint8_t tmp[16];
+    size_t full = len / 16;
+    for (size_t i = 0; i < full; i++) {
+        for (int j = 0; j < 16; j++)
+            tmp[j] = S[j] ^ data[i * 16 + j];
+        gf128_mul(tmp, H, S);
+    }
+    size_t rem = len % 16;
+    if (rem > 0) {
+        memset(tmp, 0, 16);
+        memcpy(tmp, data + full * 16, rem);
+        for (int j = 0; j < 16; j++)
+            tmp[j] ^= S[j];
+        gf128_mul(tmp, H, S);
+    }
+}
+
+/* ── AES-256-GCM encrypt (NIST SP 800-38D) ─────────────────── */
 
 int encripto_aes256_gcm_encrypt(const uint8_t key[ENCRIPTO_AES256_KEY_SIZE],
                                  const uint8_t iv[ENCRIPTO_AES256_GCM_IV_SIZE],
                                  const uint8_t *pt, size_t len,
-                                 uint8_t *ct, uint8_t tag[ENCRIPTO_AES256_GCM_TAG_SIZE]) {
-    (void)key; (void)iv;
-    if (!pt || !ct || !tag)
+                                 uint8_t *ct, uint8_t tag[ENCRIPTO_AES256_GCM_TAG_SIZE])
+{
+    if (!key || !iv || !pt || !ct || !tag)
         return ENCRIPTO_ERR_PARAM;
-    memcpy(ct, pt, len);
-    memset(tag, 0, ENCRIPTO_AES256_GCM_TAG_SIZE);
+
+    encripto_aes256_ctx *ctx = encripto_aes256_new(key);
+    if (!ctx) return ENCRIPTO_ERR_NOMEM;
+
+    uint8_t zero[16] = {0};
+    uint8_t H[16];
+    encripto_aes256_encrypt(ctx, zero, H);
+
+    uint8_t J0[16];
+    memset(J0, 0, 16);
+    memcpy(J0, iv, 12);
+    J0[15] = 1;
+
+    aes256_ctr_crypt(ctx, iv, pt, len, ct, 2);
+
+    uint8_t S[16] = {0};
+    ghash_update(S, H, ct, len);
+    uint8_t len_block[16] = {0};
+    write_be64(len_block + 8, len * 8);
+    ghash_update(S, H, len_block, 16);
+
+    uint8_t E_J0[16];
+    encripto_aes256_encrypt(ctx, J0, E_J0);
+    for (int i = 0; i < 16; i++)
+        tag[i] = S[i] ^ E_J0[i];
+
+    encripto_aes256_free(ctx);
     return ENCRIPTO_OK;
 }
+
+/* ── AES-256-GCM decrypt with constant-time tag verification ─ */
 
 int encripto_aes256_gcm_decrypt(const uint8_t key[ENCRIPTO_AES256_KEY_SIZE],
                                  const uint8_t iv[ENCRIPTO_AES256_GCM_IV_SIZE],
                                  const uint8_t *ct, size_t len,
                                  const uint8_t tag[ENCRIPTO_AES256_GCM_TAG_SIZE],
-                                 uint8_t *pt) {
-    (void)key; (void)iv; (void)tag;
-    if (!ct || !pt)
+                                 uint8_t *pt)
+{
+    if (!key || !iv || !ct || !tag || !pt)
         return ENCRIPTO_ERR_PARAM;
-    memcpy(pt, ct, len);
-    return ENCRIPTO_OK;
+
+    encripto_aes256_ctx *ctx = encripto_aes256_new(key);
+    if (!ctx) return ENCRIPTO_ERR_NOMEM;
+
+    uint8_t zero[16] = {0};
+    uint8_t H[16];
+    encripto_aes256_encrypt(ctx, zero, H);
+
+    uint8_t J0[16];
+    memset(J0, 0, 16);
+    memcpy(J0, iv, 12);
+    J0[15] = 1;
+
+    uint8_t S[16] = {0};
+    ghash_update(S, H, ct, len);
+    uint8_t len_block[16] = {0};
+    write_be64(len_block + 8, len * 8);
+    ghash_update(S, H, len_block, 16);
+
+    uint8_t E_J0[16];
+    encripto_aes256_encrypt(ctx, J0, E_J0);
+    uint8_t expected_tag[16];
+    for (int i = 0; i < 16; i++)
+        expected_tag[i] = S[i] ^ E_J0[i];
+
+    uint8_t diff = 0;
+    for (int i = 0; i < 16; i++)
+        diff |= expected_tag[i] ^ tag[i];
+
+    if (diff == 0)
+        aes256_ctr_crypt(ctx, iv, ct, len, pt, 2);
+
+    encripto_aes256_free(ctx);
+    return diff ? ENCRIPTO_ERR_AUTH : ENCRIPTO_OK;
 }
 
 /* ── FIPS 197 Section 5.1.1 / Appendix A: S-Box ──────────── */
