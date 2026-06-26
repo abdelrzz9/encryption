@@ -300,13 +300,34 @@ int  encripto_aes256_key_expand(
 void encripto_aes256_key_clear(
     uint32_t round_keys[ENCRIPTO_AES256_ROUND_KEYS]);
 
-/* ── ChaCha20-Poly1305 ───────────────────────────────────── */
+/* ── ChaCha20 stream cipher (RFC 8439) ────────────────────── */
 
 /** ChaCha20 key size in bytes. */
 #define ENCRIPTO_CHACHA20_KEY_SIZE   32
 
 /** ChaCha20 nonce size in bytes. */
 #define ENCRIPTO_CHACHA20_NONCE_SIZE 12
+
+/** ChaCha20 block size in bytes (64-byte keystream blocks). */
+#define ENCRIPTO_CHACHA20_BLOCK_SIZE 64
+
+/** Encrypt/decrypt with the ChaCha20 stream cipher (RFC 8439).
+ *  Encrypt and decrypt are identical (stream cipher XOR).
+ *  @param key    32-byte key.
+ *  @param counter Initial counter value (typically 0 or 1).
+ *  @param nonce  12-byte nonce.
+ *  @param in     Input bytes (plaintext for encrypt, ciphertext for decrypt).
+ *  @param len    Number of bytes to process.
+ *  @param out    Output buffer (same length as in).
+ *  @return ENCRIPTO_OK on success, ENCRIPTO_ERR_PARAM on NULL input.
+ */
+int encripto_chacha20_encrypt(const uint8_t key[ENCRIPTO_CHACHA20_KEY_SIZE],
+                               uint32_t counter,
+                               const uint8_t nonce[ENCRIPTO_CHACHA20_NONCE_SIZE],
+                               const uint8_t *in, size_t len,
+                               uint8_t *out);
+
+/* ── ChaCha20-Poly1305 ───────────────────────────────────── */
 
 /** ChaCha20-Poly1305 authentication tag size in bytes. */
 #define ENCRIPTO_CHACHA20_TAG_SIZE   16
