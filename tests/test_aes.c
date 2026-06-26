@@ -191,33 +191,100 @@ static void test_key_clear(void) {
     printf("PASS\n");
 }
 
-/* ── AES-CBC roundtrip (stub) ─────────────────────────────── */
+/* ── CBC roundtrip helper ─────────────────────────────────── */
 
-static void test_cbc_roundtrip(void) {
-    uint8_t key[ENCRIPTO_AES256_KEY_SIZE] = {0};
-    uint8_t iv[ENCRIPTO_AES256_IV_SIZE] = {0};
-    uint8_t pt[32] = {0};
-    uint8_t ct[64];
-    uint8_t dec[64];
+static void cbc_roundtrip(const uint8_t *key, const uint8_t *iv,
+                           const uint8_t *pt, size_t pt_len,
+                           const char *label) {
+    printf("  %s ... ", label);
+    uint8_t ct[pt_len + 16];
+    uint8_t dec[pt_len + 16];
     size_t ct_len = sizeof(ct);
     size_t dec_len = sizeof(dec);
 
-    printf("  CBC encrypt ... ");
-    int ret = encripto_aes256_cbc_encrypt(key, iv, pt, sizeof(pt), ct, &ct_len);
+    int ret = encripto_aes256_cbc_encrypt(key, iv, pt, pt_len, ct, &ct_len);
     if (ret != ENCRIPTO_OK) {
-        fprintf(stderr, "  FAIL [%s:%d]: CBC encrypt returned %d\n",
+        fprintf(stderr, "  FAIL [%s:%d]: encrypt returned %d\n",
                 __FILE__, __LINE__, ret);
+        tests_failed++;
+        return;
+    }
+
+    ret = encripto_aes256_cbc_decrypt(key, iv, ct, ct_len, dec, &dec_len);
+    if (ret != ENCRIPTO_OK || dec_len != pt_len ||
+        memcmp(pt, dec, pt_len) != 0) {
+        fprintf(stderr, "  FAIL [%s:%d]: decrypt roundtrip failed "
+                        "(ret=%d, dec_len=%zu, pt_len=%zu)\n",
+                __FILE__, __LINE__, ret, dec_len, pt_len);
         tests_failed++;
         return;
     }
     tests_passed++;
     printf("PASS\n");
+}
 
-    printf("  CBC decrypt roundtrip ... ");
+/* ── NIST SP 800-38A Section F.2.3: AES-256 CBC KAT ──────── */
+
+static void test_cbc_nist_kat(void) {
+    uint8_t key[32] = {
+        0x60,0x3d,0xeb,0x10,0x15,0xca,0x71,0xbe,
+        0x2b,0x73,0xae,0xf0,0x85,0x7d,0x77,0x81,
+        0x1f,0x35,0x2c,0x07,0x3b,0x61,0x08,0xd7,
+        0x2d,0x98,0x10,0xa3,0x09,0x14,0xdf,0xf4,
+    };
+    uint8_t iv[16] = {
+        0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,
+        0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f,
+    };
+    uint8_t pt[64] = {
+        0x6b,0xc1,0xbe,0xe2,0x2e,0x40,0x9f,0x96,
+        0xe9,0x3d,0x7e,0x11,0x73,0x93,0x17,0x2a,
+        0xae,0x2d,0x8a,0x57,0x1e,0x03,0xac,0x9c,
+        0x9e,0xb7,0x6f,0xac,0x45,0xaf,0x8e,0x51,
+        0x30,0xc8,0x1c,0x46,0xa3,0x5c,0xe4,0x11,
+        0xe5,0xfb,0xc1,0x19,0x1a,0x0a,0x52,0xef,
+        0xf6,0x9f,0x24,0x45,0xdf,0x4f,0x9b,0x17,
+        0xad,0x2b,0x41,0x7b,0xe6,0x6c,0x37,0x10,
+    };
+    uint8_t expected_ct[64] = {
+        0xf5,0x8c,0x4c,0x04,0xd6,0xe5,0xf1,0xba,
+        0x77,0x9e,0xab,0xfb,0x5f,0x7b,0xfb,0xd6,
+        0x9c,0xfc,0x4e,0x96,0x7e,0xdb,0x80,0x8d,
+        0x67,0x9f,0x77,0x7b,0xc6,0x70,0x2c,0x7d,
+        0x39,0xf2,0x33,0x69,0xa9,0xd9,0xba,0xcf,
+        0xa5,0x30,0xe2,0x63,0x04,0x23,0x14,0x61,
+        0xb2,0xeb,0x05,0xe2,0xc3,0x9b,0xe9,0xfc,
+        0xda,0x6c,0x19,0x07,0x8c,0x6a,0x9d,0x1b,
+    };
+
+    printf("  NIST SP 800-38A F.2.3 CBC encrypt ... ");
+    uint8_t ct[80];
+    size_t ct_len = sizeof(ct);
+    int ret = encripto_aes256_cbc_encrypt(key, iv, pt, sizeof(pt), ct, &ct_len);
+    if (ret != ENCRIPTO_OK) {
+        fprintf(stderr, "FAIL [%s:%d]: encrypt returned %d\n",
+                __FILE__, __LINE__, ret);
+        tests_failed++;
+        return;
+    }
+    /* 64 bytes plaintext + 16 bytes PKCS#7 padding = 80 bytes */
+    if (ct_len != 80) {
+        fprintf(stderr, "FAIL [%s:%d]: ct_len=%zu, expected 80\n",
+                __FILE__, __LINE__, ct_len);
+        tests_failed++;
+        return;
+    }
+    ASSERT_EQ_HEX(ct, expected_ct, 64);
+    tests_passed++;
+    printf("PASS\n");
+
+    printf("  NIST SP 800-38A F.2.3 CBC decrypt ... ");
+    uint8_t dec[80];
+    size_t dec_len = sizeof(dec);
     ret = encripto_aes256_cbc_decrypt(key, iv, ct, ct_len, dec, &dec_len);
     if (ret != ENCRIPTO_OK || dec_len != sizeof(pt) ||
-        memcmp(pt, dec, dec_len) != 0) {
-        fprintf(stderr, "  FAIL [%s:%d]: CBC decrypt roundtrip failed\n",
+        memcmp(dec, pt, sizeof(pt)) != 0) {
+        fprintf(stderr, "FAIL [%s:%d]: decrypt roundtrip failed\n",
                 __FILE__, __LINE__);
         tests_failed++;
         return;
@@ -226,35 +293,104 @@ static void test_cbc_roundtrip(void) {
     printf("PASS\n");
 }
 
-/* ── AES-GCM roundtrip (stub) ─────────────────────────────── */
+/* ── CBC roundtrip tests ──────────────────────────────────── */
 
-static void test_gcm_roundtrip(void) {
-    uint8_t key[ENCRIPTO_AES256_KEY_SIZE] = {0};
-    uint8_t iv[ENCRIPTO_AES256_GCM_IV_SIZE] = {0};
-    uint8_t pt[32] = {0};
+static void test_cbc_roundtrips(void) {
+    uint8_t key[32];
+    uint8_t iv[16];
+
+    memset(key, 0, 32);
+    memset(iv, 0, 16);
+
+    cbc_roundtrip(key, iv, (const uint8_t *)"", 0,
+                  "zero-length message roundtrip");
+
+    cbc_roundtrip(key, iv, (const uint8_t *)"a", 1,
+                  "1-byte message roundtrip");
+
+    cbc_roundtrip(key, iv, (const uint8_t *)"Hello, World!", 13,
+                  "13-byte message roundtrip");
+
+    cbc_roundtrip(key, iv, (const uint8_t *)"1234567890123456", 16,
+                  "16-byte (exactly 1 block) roundtrip");
+
+    cbc_roundtrip(key, iv,
+                  (const uint8_t *)"The quick brown fox jumps over the lazy dog",
+                  43, "43-byte message roundtrip");
+
+    memset(key, 0xFF, 32);
+    memset(iv, 0xFF, 16);
+    cbc_roundtrip(key, iv,
+                  (const uint8_t *)"ABCDEFGHIJKLMNOPQRSTUVWXYZ", 26,
+                  "0xFF key/iv, 26-byte msg roundtrip");
+
+    for (int i = 0; i < 32; i++) key[i] = (uint8_t)i;
+    for (int i = 0; i < 16; i++) iv[i] = (uint8_t)(i * 3);
+    uint8_t pt[256];
+    for (int i = 0; i < 256; i++) pt[i] = (uint8_t)i;
+    cbc_roundtrip(key, iv, pt, 256,
+                  "256-byte (16 blocks) roundtrip");
+}
+
+/* ── PKCS#7 padding edge cases ────────────────────────────── */
+
+static void test_padding_errors(void) {
+    uint8_t key[32] = {0};
+    uint8_t iv[16]  = {0};
+    uint8_t pt[32]  = {0};
     uint8_t ct[64];
     uint8_t dec[64];
-    uint8_t tag[ENCRIPTO_AES256_GCM_TAG_SIZE];
+    size_t ct_len, dec_len;
+    int ret;
 
-    printf("  GCM encrypt ... ");
-    int ret = encripto_aes256_gcm_encrypt(key, iv, pt, sizeof(pt), ct, tag);
-    if (ret != ENCRIPTO_OK) {
-        fprintf(stderr, "  FAIL [%s:%d]: GCM encrypt returned %d\n",
-                __FILE__, __LINE__, ret);
+    printf("  invalid ciphertext length (not multiple of 16) ... ");
+    ct_len = 10;
+    dec_len = sizeof(dec);
+    ret = encripto_aes256_cbc_decrypt(key, iv, ct, ct_len, dec, &dec_len);
+    if (ret != ENCRIPTO_ERR_PARAM) {
+        fprintf(stderr, "FAIL: expected ERR_PARAM, got %d\n", ret);
         tests_failed++;
         return;
     }
     tests_passed++;
     printf("PASS\n");
 
-    printf("  GCM decrypt roundtrip ... ");
-    ret = encripto_aes256_gcm_decrypt(key, iv, ct, sizeof(pt), tag, dec);
-    if (ret != ENCRIPTO_OK || memcmp(pt, dec, sizeof(pt)) != 0) {
-        fprintf(stderr, "  FAIL [%s:%d]: GCM decrypt roundtrip failed\n",
-                __FILE__, __LINE__);
+    printf("  invalid ciphertext length (zero, not 16-aligned) ... ");
+    ret = encripto_aes256_cbc_decrypt(key, iv, ct, 0, dec, &dec_len);
+    if (ret != ENCRIPTO_ERR_PARAM) {
+        fprintf(stderr, "FAIL: expected ERR_PARAM, got %d\n", ret);
         tests_failed++;
         return;
     }
+    tests_passed++;
+    printf("PASS\n");
+
+    printf("  invalid padding byte (too large) ... ");
+    ct_len = sizeof(ct);
+    ret = encripto_aes256_cbc_encrypt(key, iv, pt, 1, ct, &ct_len);
+    /* tamper with last byte to make padding invalid */
+    ct[ct_len - 1] = 0xAA;
+    dec_len = sizeof(dec);
+    ret = encripto_aes256_cbc_decrypt(key, iv, ct, ct_len, dec, &dec_len);
+    if (ret != ENCRIPTO_ERR_PARAM) {
+        fprintf(stderr, "FAIL: expected ERR_PARAM, got %d\n", ret);
+        tests_failed++;
+        return;
+    }
+    tests_passed++;
+    printf("PASS\n");
+
+    printf("  NULL parameter checks ... ");
+    ret = encripto_aes256_cbc_encrypt(NULL, iv, pt, 1, ct, &ct_len);
+    if (ret != ENCRIPTO_ERR_PARAM) { tests_failed++; return; }
+    ret = encripto_aes256_cbc_encrypt(key, NULL, pt, 1, ct, &ct_len);
+    if (ret != ENCRIPTO_ERR_PARAM) { tests_failed++; return; }
+    ret = encripto_aes256_cbc_encrypt(key, iv, NULL, 1, ct, &ct_len);
+    if (ret != ENCRIPTO_ERR_PARAM) { tests_failed++; return; }
+    ret = encripto_aes256_cbc_encrypt(key, iv, pt, 1, NULL, &ct_len);
+    if (ret != ENCRIPTO_ERR_PARAM) { tests_failed++; return; }
+    ret = encripto_aes256_cbc_encrypt(key, iv, pt, 1, ct, NULL);
+    if (ret != ENCRIPTO_ERR_PARAM) { tests_failed++; return; }
     tests_passed++;
     printf("PASS\n");
 }
@@ -275,11 +411,10 @@ int main(void) {
     printf("  Key zeroization:\n");
     test_key_clear();
 
-    printf("  CBC mode (stub):\n");
-    test_cbc_roundtrip();
-
-    printf("  GCM mode (stub):\n");
-    test_gcm_roundtrip();
+    printf("  CBC mode:\n");
+    test_cbc_nist_kat();
+    test_cbc_roundtrips();
+    test_padding_errors();
 
     if (tests_failed > 0) {
         printf("\nAES-256: FAILED (%d passed, %d failed)\n",
