@@ -364,6 +364,51 @@ int encripto_chacha20_poly1305_decrypt(
     const uint8_t tag[ENCRIPTO_CHACHA20_TAG_SIZE],
     uint8_t *pt);
 
+/* ── Poly1305 one-time MAC (RFC 8439 Section 2.5) ─────────── */
+
+/** Poly1305 key size in bytes. */
+#define ENCRIPTO_POLY1305_KEY_SIZE   32
+
+/** Poly1305 authentication tag size in bytes. */
+#define ENCRIPTO_POLY1305_TAG_SIZE   16
+
+/** Poly1305 computation context (5-limb radix-2^26 representation). */
+typedef struct {
+    uint64_t r[5];         /**< clamped key r (0-4) */
+    uint64_t s[4];         /**< r[1..4] * 5 (precomputed) */
+    uint64_t h[5];         /**< 130-bit accumulator */
+    uint64_t pad[2];       /**< pad s loaded as two 64-bit LE words */
+    uint8_t  buffer[16];   /**< partial block buffer */
+    size_t   buffer_len;   /**< bytes used in buffer */
+} encripto_poly1305_ctx;
+
+/** Initialize a Poly1305 MAC computation with a one-time key.
+ *  @param ctx  Context to initialize (must not be NULL).
+ *  @param key  32-byte one-time key (first 16 bytes = r, last 16 = s).
+ *  @return ENCRIPTO_OK on success, ENCRIPTO_ERR_PARAM on NULL input.
+ */
+int encripto_poly1305_init(encripto_poly1305_ctx *ctx,
+                            const uint8_t key[ENCRIPTO_POLY1305_KEY_SIZE]);
+
+/** Process arbitrary-length data through Poly1305.
+ *  Can be called multiple times. Input is buffered internally.
+ *  @param ctx  Initialised Poly1305 context.
+ *  @param data Input bytes.
+ *  @param len  Number of bytes.
+ *  @return ENCRIPTO_OK on success, ENCRIPTO_ERR_PARAM on NULL input.
+ */
+int encripto_poly1305_update(encripto_poly1305_ctx *ctx,
+                              const uint8_t *data, size_t len);
+
+/** Finalise the Poly1305 MAC and produce the 16-byte tag.
+ *  Context is zeroed after this call (safe to reuse with init).
+ *  @param ctx  Initialised Poly1305 context.
+ *  @param tag  16-byte authentication tag output.
+ *  @return ENCRIPTO_OK on success, ENCRIPTO_ERR_PARAM on NULL input.
+ */
+int encripto_poly1305_final(encripto_poly1305_ctx *ctx,
+                             uint8_t tag[ENCRIPTO_POLY1305_TAG_SIZE]);
+
 /* ── RSA-4096 ────────────────────────────────────────────── */
 
 /** RSA-4096 key size in bits. */
